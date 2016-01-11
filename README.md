@@ -1,6 +1,9 @@
 # gen_ssm_db
 
-## Install Dependencies
+This repository contains the code used make a solar system model of 11 million orbital elements queryable. For more information on context see SSDBM2011 poster: http://www.astro.washington.edu/users/yusra/SSDBM/SSDBMYA_print_final3.pdf
+
+
+## Step 1: Install OpenOrb
 
 ```
 git clone https://github.com/EUPSForge/oorb.git
@@ -45,20 +48,21 @@ export OORB_CONF=$PWD/main/oorb.conf
 You will also need the planetary ephemeris file: de405.dat.
 Put this in data/
 
-## Run unit tests
+## Step 2: Clone and run unit tests
 ```
 git clone https://github.com/yalsayyad/gen_ssm_db.git
 cd gen_ssm_db
 export PYTHONPATH=$PWD:$PYTHONPATH
 python tests/testChebFitAndEval.py
 ```
-and check that the main executable runs:
+and check the main executable:
 ```
-python gen_coeff_flexible_recursive.py tests/S1_00.zzz_49353.des 49383 30 14 30```
+python gen_coeff_flexible_recursive.py tests/S1_00.zzz_49353.des 49383 30 14 30
+```
 
 ## Running on a cluster
 
-There are two types of clusters: clusters wherein you recieve a whole node per job and must utlize all cores, and clusters wherein you receive one core per job. This following procedure assumes the former. 
+There are two types of clusters: clusters in which you recieve a whole node per job and must utlize all cores, and clusters in which you receive one core per job. This following procedure assumes the former.
 
 * Install gnu parallel: http://www.gnu.org/software/parallel/
 * Copy over your orbit (.des) files and split them into files with 10000 lines.
@@ -82,9 +86,9 @@ $SHARED_SCRATCH/orbits/49353/
 		S1_12.xdv_49353.des	
 ```
 
-* Make an empty directory structure of MJDs spaced 30 days apart.
+* Make an empty directory structure of MJDs spaced 30 days apart to hold the output coefficients.
 ```
-$SHARED_SCRATCH/orbits/
+$SHARED_SCRATCH/coeffs/
 	49343/
 		S1_00
 		S1_01
@@ -100,7 +104,9 @@ $SHARED_SCRATCH/orbits/
   	52973/
 ```
 
-* Make pbs files
+* Check that the shell script that sets up all necessary environment variables,  copies the data to and back from the node, and runs the main executable gen_coeff_flexible_recursive.py works. 
+
+* Make pbs files or scheduler-specific jobs.
 
 * submit pbs files e.g.
-`for file  in  S1_10_*.pbs; do qsub $file; done;'
+`for file  in  S1_10_*.pbs; do qsub $file; done;`
