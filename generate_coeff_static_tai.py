@@ -136,7 +136,7 @@ def main(argv):
     # Make Multiplier Dict:
     VMAG_COEFF = 9
     DIST_COEFF = 5
-    SE_COEFF = 8
+    SE_COEFF = 6
     npoints = int(rows_per_day)*int(range)
     # Precompute multiplier because
     # we don't want to invert a matrix for every segment
@@ -168,14 +168,16 @@ def main(argv):
                                          multiplier['DIST'])
             v, v_resid = get_coeffs_vmag(t[day0:day1 + 1:skip], vmag[day0:day1 + 1:skip], ngran, npoint, 9,
                                          multiplier['VMAG_X'])
-            s, s_resid = get_coeffs_se(t[day0:day1 + 1:skip], se[day0:day1 + 1:skip], ngran, npoint, 8,
+            s, s_resid = get_coeffs_se(t[day0:day1 + 1:skip], se[day0:day1 + 1:skip], ngran, npoint, 6,
                                        multiplier['SE_X'])
             vmagresidarray = np.append(vmagresidarray,  v_resid)
             deltaresidarray = np.append(deltaresidarray,  d_resid)
             residarray = np.append(residarray, p_resid)
 
             print >>ResidualSumfile, "%i %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e %s"%(ssmid[day0], rows, t[day0], t[day1], t[day1] - t[day0], p_resid, d_resid, v_resid, s_resid, inputfilename[-1])
-            print >>CoeffFile, "%i %i %.6f %.6f %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e"%(0,ssmid[day0], t[day0], t[day1], pra[0],pra[1],pra[2],pra[3],pra[4],pra[5],pra[6],pra[7],pra[8],pra[9],pra[10],pra[11],pra[12],pra[13],pdec[0],pdec[1],pdec[2],pdec[3],pdec[4],pdec[5],pdec[6],pdec[7],pdec[8],pdec[9],pdec[10],pdec[11],pdec[12],pdec[13],d[0],d[1],d[2],d[3],d[4],v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8],s[0],s[1],s[2],s[3],s[4],s[5])
+            print >>CoeffFile, "%i %s %.6f %.6f %s %s %s %s %s"%(0,
+                                ssmid[day0], t[day0], t[day1],  " ".join('%.14e'%j for j in pra), " ".join('%.14e'%j for j in pdec),
+                                " ".join('%.7e'%j for j in d), " ".join('%.7e'%j for j in v),   " ".join('%.7e'%j for j in s))
 
             # advance to the next day if less than 6 points left in month
             day0 = day1
