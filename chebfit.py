@@ -4,6 +4,7 @@ Implementation of Newhall, X. X. 1989, Celestial Mechanics, 45, p. 305-310
 """
 import numpy as np
 import chebeval as cec
+import warnings
 
 
 def makeChebMatrix(nPoints, nPoly, weight=0.16):
@@ -192,9 +193,13 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
         redoV = (dxMultiplier.shape[1] != nPoints) | (dxMultiplier.shape[0] != nPoly)
 
     if (dxdt is None) & redoX:
+        warnings.warn("Chebfit making x-only multiplier for npoints=%s, coeff=%s." % (nPoints, nPoly) +
+                      "Routine could be sped up by precumputing matrix using makeChebMatrixOnlyX()")
         xMultiplier = makeChebMatrixOnlyX(nPoints, nPoly)
 
     if (dxdt is not None) & (redoV | redoX):
+        warnings.warn("Chebfit making multipliers for npoints=%s, coeff=%s." % (nPoints, nPoly) +
+                      "Routine could be sped up by precumputing matrix using makeChebMatrix()")
         xMultiplier, dxMultiplier = makeChebMatrix(nPoints, nPoly)
 
     if x.size != nPoints:

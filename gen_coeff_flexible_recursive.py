@@ -35,30 +35,33 @@ def sphericalDistance(origin, destination):
     return d*180.0/np.pi
 
 
-def get_coeffs_position(t, ra, dec, dracoorddt, ddecdt, ng, npo, coeff):
-    p, dec_resid, dec_rms = cg.chebfit(t, dec, ddecdt, nPoly=coeff)
-    rap, ra_resid, ra_rms = cg.chebfit(t, ra, dracoorddt, nPoly=coeff)
+def get_coeffs_position(t, ra, dec, dracoorddt, ddecdt, ng, npo, coeff, multiplier=(None, None)):
+    p, dec_resid, dec_rms = cg.chebfit(t, dec, ddecdt,
+                                       xMultiplier=multiplier[0], dxMultiplier=multiplier[1], nPoly=coeff)
+    rap, ra_resid, ra_rms = cg.chebfit(t, ra, dracoorddt,
+                                       xMultiplier=multiplier[0], dxMultiplier=multiplier[1], nPoly=coeff)
     ra_real_resid = (ra_resid)*np.cos(np.pi*dec/180.)
     return p, rap, 3600.0*1000.0*np.max(np.sqrt(dec_resid**2 + ra_real_resid**2))
 
 
-def get_coeffs_vmag(t, vmag, ng, npo, coeff):
-    p, resid, rms = cg.chebfit(t, vmag, None, nPoly=coeff)
+def get_coeffs_vmag(t, vmag, ng, npo, coeff, multiplier=None):
+    p, resid, rms = cg.chebfit(t, vmag, None, xMultiplier=multiplier, nPoly=coeff)
     return p, np.max(np.abs(resid))
 
 
-def get_coeffs_se(t, se, ng, npo, coeff):
-    p, resid, rms = cg.chebfit(t, se, None, nPoly=coeff)
+def get_coeffs_se(t, se, ng, npo, coeff, multiplier=None):
+    p, resid, rms = cg.chebfit(t, se, None, xMultiplier=multiplier, nPoly=coeff)
     return p, np.max(np.abs(resid))
 
 
-def get_coeffs_dist(t, dist, distdt, ng, npo, coeff):
-    p, resid, rms = cg.chebfit(t, dist, distdt, nPoly=coeff)
+def get_coeffs_dist(t, dist, distdt, ng, npo, coeff, multiplier=(None, None)):
+    p, resid, rms = cg.chebfit(t, dist, distdt,
+                               xMultiplier=multiplier[0], dxMultiplier=multiplier[1], nPoly=coeff)
     return p, np.max(np.abs(resid))
 
 
-def get_coeffs_dist2(t, dist, ng, npo, coeff):
-    p, resid, rms = cg.chebfit(t, dist, None, nPoly=coeff)
+def get_coeffs_dist2(t, dist, ng, npo, coeff, multiplier=None):
+    p, resid, rms = cg.chebfit(t, dist, None, xMultiplier=multiplier, nPoly=coeff)
     return p, np.max(np.abs(resid))
 
 
@@ -204,7 +207,7 @@ def getGran(ssmid, mymo, start_time, days, coeff):
     return timestep, length, ngran
 
 
-def breakItDown(ssmid, mymo, start_time, timestep,  days,  ngran,  coeff, CoeffFile,
+def breakItDown(ssmid, mymo, start_time, timestep,  days,  ngran,  coeff,  multiplier, CoeffFile,
                 ResidualSumfile, Failedfile,  inputfilename):
     timestep = timestep/2.
     length = days/2
@@ -217,11 +220,11 @@ def breakItDown(ssmid, mymo, start_time, timestep,  days,  ngran,  coeff, CoeffF
         print "test presid RECURSIVE is", p_resid
     timestep, length = adjustTimeLengthExtreme(p_resid, dec[0], timestep, length)
     doOneRecursiveSegment(ssmid, mymo, start_time, days, coeff, timestep, length, ngran,
-                          CoeffFile, ResidualSumfile, Failedfile,  inputfilename)
+                          multiplier, CoeffFile, ResidualSumfile, Failedfile, inputfilename)
 
 
 def doOneRecursiveSegment(ssmid, mymo, start_time, days, coeff, timestep, length, ngran,
-                          CoeffFile, ResidualSumfile, Failedfile, inputfilename):
+                          multiplier, CoeffFile, ResidualSumfile, Failedfile, inputfilename):
     t, ra, dec, dracoorddt, ddecdt, vmag, dist, se = getEphem(mymo, start_time, days, timestep)
     # now we have our arrays and fit exactly like before
     day0 = 0
@@ -234,16 +237,16 @@ def doOneRecursiveSegment(ssmid, mymo, start_time, days, coeff, timestep, length
                                                               np.min(ra[day0:day1+1]),
                                                               np.max(ra[day0:day1+1])),
                                                  dec[day0:day1+1], dracoorddt[day0:day1+1], ddecdt[day0:day1+1],
-                                                 ngran, npoint, coeff)
+                                                 ngran, npoint, coeff, multiplier['POSITION'])
         if p_resid > 2.5:
             if DEBUG:
                 print "oh no!:", p_resid
-            breakItDown(ssmid, mymo, t[day0], timestep, length, ngran, coeff,
+            breakItDown(ssmid, mymo, t[day0], timestep, length, ngran, coeff, multiplier,
                         CoeffFile, ResidualSumfile, Failedfile,  inputfilename)
         else:  # we're good. Print it out to file
-            d, d_resid = get_coeffs_dist2(t[day0:day1+1], dist[day0:day1+1], ngran, npoint, 5)
-            v, v_resid = get_coeffs_vmag(t[day0:day1+1], vmag[day0:day1+1], ngran, npoint, 9)
-            s, s_resid = get_coeffs_se(t[day0:day1+1], se[day0:day1+1], ngran, npoint, 8)
+            d, d_resid = get_coeffs_dist2(t[day0:day1+1], dist[day0:day1+1], ngran, npoint, 5, multiplier['DIST_X'])
+            v, v_resid = get_coeffs_vmag(t[day0:day1+1], vmag[day0:day1+1], ngran, npoint, 9, multiplier['VMAG_X'])
+            s, s_resid = get_coeffs_se(t[day0:day1+1], se[day0:day1+1], ngran, npoint, 8, multiplier['SE_X'])
             if np.isnan(v_resid) | np.isnan(d_resid) | np.isnan(s_resid):
                 print 'do not print!!'
                 print >>Failedfile, "%s %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e %s" % (
@@ -260,7 +263,7 @@ def doOneRecursiveSegment(ssmid, mymo, start_time, days, coeff, timestep, length
         rows = rows + 1
 
 
-def doOneMonth(ssmid, mymo, start_time, days, coeff, CoeffFile, ResidualSumfile,
+def doOneMonth(ssmid, mymo, start_time, days, coeff, multiplier, CoeffFile, ResidualSumfile,
                Failedfile, inputfilename, knownGran=True):
     if not knownGran:
         timestep, length, ngran = getGran(ssmid, mymo, start_time, days, coeff)
@@ -271,7 +274,7 @@ def doOneMonth(ssmid, mymo, start_time, days, coeff, CoeffFile, ResidualSumfile,
         length = 2.0
         ngran = 64
     doOneRecursiveSegment(ssmid, mymo, start_time, days, coeff, timestep,
-                          length, ngran, CoeffFile, ResidualSumfile,
+                          length, ngran,  multiplier, CoeffFile, ResidualSumfile,
                           Failedfile,  inputfilename)
 
 
@@ -309,6 +312,21 @@ def main(argv):
     oo.pyoorb.oorb_init(ephemeris_fname="")
     print 'total days ', totaldays
 
+    # Make Multiplier Dict:
+    VMAG_COEFF = 9
+    DIST_COEFF = 5
+    SE_COEFF = 8
+
+    # Precompute multiplier because
+    # we don't want to invert a matrix for every segment
+    nPoints = 64
+    multipliers = {}
+    multipliers['POSITION'] = cg.makeChebMatrix(nPoints + 1, coeff, weight=0.16)
+    multipliers['VMAG_X'] = cg.makeChebMatrixOnlyX(nPoints + 1, VMAG_COEFF)
+    multipliers['DIST'] = cg.makeChebMatrix(nPoints + 1, DIST_COEFF, weight=0.16)
+    multipliers['DIST_X'] = cg.makeChebMatrixOnlyX(nPoints + 1, DIST_COEFF)
+    multipliers['SE_X'] = cg.makeChebMatrixOnlyX(nPoints + 1, SE_COEFF)
+
     # check if only 1 row
     theShape = orbit.shape
     if len(theShape) == 2:
@@ -328,7 +346,7 @@ def main(argv):
 
         tmpStartTime = start_time
         while tmpStartTime < start_time + totaldays:
-            doOneMonth(id, mymo, tmpStartTime, days, coeff, CoeffFile,
+            doOneMonth(id, mymo, tmpStartTime, days, coeff, multipliers, CoeffFile,
                        ResidualSumfile, Failedfile, inputfilename[-1])
             tmpStartTime += days
 

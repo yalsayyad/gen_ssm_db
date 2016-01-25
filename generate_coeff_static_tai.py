@@ -36,27 +36,31 @@ def utc2tai(tUTC):
 
 vUtc2Tai = np.vectorize(utc2tai)
 
-
-def get_coeffs_position(t, ra, dec, draskydt, ddecdt, ng, npo, coeff):
-    p, dec_resid, dec_rms = cg.chebfit(t, dec, ddecdt, nPoly=coeff)
-    rap, ra_coord_resid, ra_rms = cg.chebfit(t, ra, draskydt/np.cos(np.pi*dec/180.), nPoly=coeff)
+def get_coeffs_position(t, ra, dec, draskydt, ddecdt, ng, npo, coeff, multiplier=(None, None)):
+    p, dec_resid, dec_rms = cg.chebfit(t, dec, ddecdt,
+                                       xMultiplier=multiplier[0], dxMultiplier=multiplier[1], nPoly=coeff)
+    rap, ra_coord_resid, ra_rms = cg.chebfit(t, ra, draskydt/np.cos(np.pi*dec/180.),
+                                             xMultiplier=multiplier[0], dxMultiplier=multiplier[1],
+                                             nPoly=coeff)
     ra_sky_resid = (ra_coord_resid)*np.cos(np.pi*dec/180.)
     return p, rap, 3600.0*1000.0*np.max(np.sqrt(dec_resid**2 + ra_sky_resid**2))
 
 
-def get_coeffs_vmag(t, vmag, ng, npo, coeff):
-    p, resid, rms = cg.chebfit(t, vmag, None, nPoly=coeff)
+def get_coeffs_vmag(t, vmag, ng, npo, coeff, multiplier=None):
+    p, resid, rms = cg.chebfit(t, vmag, None, xMultiplier=multiplier, nPoly=coeff)
     return p, np.max(np.abs(resid))
 
 
-def get_coeffs_se(t, se, ng, npo, coeff):
-    p, resid, rms = cg.chebfit(t, se, None, nPoly=coeff)
+def get_coeffs_se(t, se, ng, npo, coeff, multiplier=None):
+    p, resid, rms = cg.chebfit(t, se, None, xMultiplier=multiplier, nPoly=coeff)
     return p, np.max(np.abs(resid))
 
 
-def get_coeffs_dist(t, dist, distdt, ng, npo, coeff):
-    p, resid, rms = cg.chebfit(t, dist, distdt, nPoly=coeff)
+def get_coeffs_dist(t, dist, distdt, ng, npo, coeff, multiplier=(None, None)):
+    p, resid, rms = cg.chebfit(t, dist, distdt,
+                               xMultiplier=multiplier[0], dxMultiplier=multiplier[1], nPoly=coeff)
     return p, np.max(np.abs(resid))
+
 
 
 def three_sixy_to_neg(element, min, max):
@@ -129,6 +133,20 @@ def main(argv):
     vmagresidarray = np.array([])
     v_360_to_neg = np.vectorize(three_sixy_to_neg)
 
+    # Make Multiplier Dict:
+    VMAG_COEFF = 9
+    DIST_COEFF = 5
+    SE_COEFF = 8
+    npoints = int(rows_per_day)*int(range)
+    # Precompute multiplier because
+    # we don't want to invert a matrix for every segment
+    multiplier = {}
+    multiplier['POSITION'] = cg.makeChebMatrix(npoints + 1, coeff, weight=0.16)
+    multiplier['VMAG_X'] = cg.makeChebMatrixOnlyX(npoints + 1, VMAG_COEFF)
+    multiplier['DIST'] = cg.makeChebMatrix(npoints + 1, DIST_COEFF, weight=0.16)
+    multiplier['DIST_X'] = cg.makeChebMatrixOnlyX(npoints + 1, DIST_COEFF)
+    multiplier['SE_X'] = cg.makeChebMatrixOnlyX(npoints + 1, SE_COEFF)
+
     while outerday0 < len(ephem[0]):
         day0 = outerday0
         day1 = outerday0 + daystart
@@ -143,15 +161,18 @@ def main(argv):
                                                                   np.min(ra[day0:day1 + 1:skip]),
                                                                   np.max(ra[day0:day1 + 1:skip])),
                                                      dec[day0:day1 + 1:skip], draskydt[day0:day1 + 1:skip],
-                                                     ddecdt[day0:day1 + 1:skip], ngran, npoint, coeff)
+                                                     ddecdt[day0:day1 + 1:skip], ngran, npoint, coeff,
+                                                     multiplier['POSITION'])
             d, d_resid = get_coeffs_dist(t[day0:day1 + 1:skip], dist[day0:day1 + 1:skip],
-                                         distdt[day0:day1 + 1:skip], ngran, npoint, 5)
-            v, v_resid = get_coeffs_vmag(t[day0:day1 + 1:skip], vmag[day0:day1 + 1:skip], ngran, npoint, 9)
-            s, s_resid = get_coeffs_se(t[day0:day1 + 1:skip], se[day0:day1 + 1:skip], ngran, npoint, 8)
+                                         distdt[day0:day1 + 1:skip], ngran, npoint, 5,
+                                         multiplier['DIST'])
+            v, v_resid = get_coeffs_vmag(t[day0:day1 + 1:skip], vmag[day0:day1 + 1:skip], ngran, npoint, 9,
+                                         multiplier['VMAG_X'])
+            s, s_resid = get_coeffs_se(t[day0:day1 + 1:skip], se[day0:day1 + 1:skip], ngran, npoint, 8,
+                                       multiplier['SE_X'])
             vmagresidarray = np.append(vmagresidarray,  v_resid)
             deltaresidarray = np.append(deltaresidarray,  d_resid)
             residarray = np.append(residarray, p_resid)
-
 
             print >>ResidualSumfile, "%i %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e %s"%(ssmid[day0], rows, t[day0], t[day1], t[day1] - t[day0], p_resid, d_resid, v_resid, s_resid, inputfilename[-1])
             print >>CoeffFile, "%i %i %.6f %.6f %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e"%(0,ssmid[day0], t[day0], t[day1], pra[0],pra[1],pra[2],pra[3],pra[4],pra[5],pra[6],pra[7],pra[8],pra[9],pra[10],pra[11],pra[12],pra[13],pdec[0],pdec[1],pdec[2],pdec[3],pdec[4],pdec[5],pdec[6],pdec[7],pdec[8],pdec[9],pdec[10],pdec[11],pdec[12],pdec[13],d[0],d[1],d[2],d[3],d[4],v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8],s[0],s[1],s[2],s[3],s[4],s[5])
