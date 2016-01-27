@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -q normal
+#PBS -A nsa101
+#PBS -m a
+#PBS -N S1_01_49943
+#PBS -M yusra@astro.washington.edu
+#PBS -V
+#PBS -j oe
+#PBS -l walltime=14:00:00
+#PBS -l nodes=1:ppn=16:native
+#PBS -V
+cd /oasis/scratch/yusra/$PBS_JOBID
+### ---------------------------------------
+### Beginning of Executable Sections 
+### ---------------------------------------
+ 
+### ---------------------------------------
+### Create logging information
+### ---------------------------------------
+ 
+set pbs_job_id = `echo $PBS_JOBID | awk -F . '{print $1}'`
+set num_procs = `wc -l < $PBS_NODEFILE`
+set master_node_id = `hostname`
+echo This is job $pbs_job_id
+echo The master node of this job is $master_node_id
+echo The directory from which this job was submitted is $PBS_O_WORKDIR
+echo The directory in which this job will run is /oasis/scratch/yusra/$PBS_JOBID
+echo This job is running on  $num_procs processors
+echo This job is starting at `date`
+echo ---
+ls /oasis/scratch/yusra/temp_project/orbits/49353/S1_01/*_49353.des | parallel -j+0 '/oasis/scratch/yusra/temp_project/ssm_src/gen_ephems_monthly.csh {/.} 49943' 
+rm fort.10
+### ---------------------------------------
+### DELETE the local (node) directories and all files
+###   (does not delete parent directories if created
+### ---------------------------------------
+### echo Now deleting files in /oasis/scratch/yusra/$PBS_JOBID
+### /bin/rm -rf /oasis/scratch/yusra/$PBS_JOBID
+echo ---
+echo PBS job finished at `date`
+ 
+###
